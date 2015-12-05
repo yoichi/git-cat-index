@@ -2,6 +2,7 @@
 import hashlib
 import sys
 
+
 def get_integer(buf, index, size):
     value = 0
     while size > 0:
@@ -13,11 +14,15 @@ def get_integer(buf, index, size):
 
 
 def parse_header(data, ptr, metadata):
-    if data[ptr:ptr+4] != "DIRC":
+    """Parse 12-byte header and checksum"""
+    # 4-byte signature stands for "dircache"
+    sig = data[ptr:ptr+4]
+    if sig != "DIRC":
         print("%s is not a index file" % sys.argv[1])
         sys.exit(-1)
     ptr += 4
 
+    # 4-byte version number
     version = get_integer(data, ptr, 4)
     if version not in (2, 3, 4):
         print("unsupported version number %d", version)
@@ -25,6 +30,7 @@ def parse_header(data, ptr, metadata):
     metadata["version"] = version
     ptr += 4
 
+    # 32-bit number of index entries
     metadata["number"] = get_integer(data, ptr, 4)
     ptr += 4
 
@@ -39,10 +45,12 @@ def parse_header(data, ptr, metadata):
         sys.exit(-1)
     metadata["endptr"] = size - 20
 
+    print("%s (dircache), %d entries" % (sig, metadata["number"]))
     return ptr
 
 
 def parse_entry(data, ptr, metadata):
+    """Parse index entry"""
     entry_begin = ptr
     # ctime seconds
     ptr += 4
@@ -63,9 +71,9 @@ def parse_entry(data, ptr, metadata):
     # gid
     ptr += 4
     # file size
-    print("fsize: %d" % get_integer(data, ptr, 4))
     ptr += 4
-    # SHA-1
+    # SHA-1 hash of blob object
+    sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
     ptr += 20
     # flags
     flags = get_integer(data, ptr, 2)
@@ -76,18 +84,73 @@ def parse_entry(data, ptr, metadata):
         ptr += 2
     name_length = flags & 0xFFF
     if name_length < 0xFFF:
-        print("name: %s" % data[ptr:ptr+name_length])
+        print("%s %s" % (sha1, data[ptr:ptr+name_length]))
         ptr += name_length
     else:
         name_end = data.find("\0", ptr)
         assert name_end != -1
-        print("name: %s" % data[ptr:name_end])
+        print("%s %s" % (sha1, data[ptr:name_end]))
         ptr = name_end
 
     if metadata["version"] != 4:
         # 1-8 nul bytes
         ptr += 8 - (ptr - entry_begin) % 8
     return ptr
+
+
+def parse_ext_tree(data, ptr, size, metadata):
+    """Parse payload of cached tree extension"""
+    end = ptr+size
+    while ptr < end:
+        path_end = data.find("\0", ptr, end)
+        assert path_end != -1
+        path = data[ptr:path_end]
+        ptr = path_end+1
+
+        entry_count_end = data.find(" ", ptr, end)
+        assert entry_count_end != -1
+        entry_count = data[ptr:entry_count_end]
+        ptr = entry_count_end+1
+
+        subtrees_end = data.find("\n", ptr, end)
+        assert subtrees_end != 1
+        subtrees = data[ptr:subtrees_end]
+        ptr = subtrees_end+1
+
+        assert ptr+20 <= end
+        sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
+        print("%s (%s/%s) %s" % (sha1, subtrees, entry_count, path))
+        ptr += 20
+
+
+def parse_ext_reuc(data, ptr, size, metadata):
+    """Parse payload of resolve undo extension"""
+    pass
+
+
+def parse_ext_link(data, ptr, size, metadata):
+    """Parse payload of split index extension"""
+    pass
+
+
+def parse_extension(data, ptr, metadata):
+    sig = data[ptr:ptr+4]
+    ptr += 4
+
+    size = get_integer(data, ptr, 4)
+    ptr += 4
+
+    print(sig)
+    if sig == "TREE":
+        parse_ext_tree(data, ptr, size, metadata)
+    elif sig == "REUC":
+        parse_ext_reuc(data, ptr, size, metadata)
+    elif sig == "link":
+        parse_ext_link(data, ptr, size, metadata)
+    else:
+        raise Exception("unknown signature %s" % sig)
+
+    return ptr + size
 
 
 # https://www.kernel.org/pub/software/scm/git/docs/technical/index-format.txt
@@ -106,7 +169,11 @@ def main(fname):
     ptr = parse_header(data, ptr, metadata)
 
     while ptr < metadata["endptr"]:
-        ptr = parse_entry(data, ptr, metadata)
+        if metadata["number"] > 0:
+            ptr = parse_entry(data, ptr, metadata)
+            metadata["number"] -= 1
+        else:
+            ptr = parse_extension(data, ptr, metadata)
 
 
 if __name__ == '__main__':
