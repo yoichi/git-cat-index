@@ -3,7 +3,7 @@ import hashlib
 import sys
 
 
-def get_integer(buf, index, size):
+def _get_integer(buf, index, size):
     value = 0
     while size > 0:
         value <<= 8
@@ -13,7 +13,7 @@ def get_integer(buf, index, size):
     return value
 
 
-def parse_header(data, ptr, metadata):
+def _parse_header(data, ptr, metadata):
     """Parse 12-byte header and checksum"""
     # 4-byte signature stands for "dircache"
     sig = data[ptr:ptr+4]
@@ -23,7 +23,7 @@ def parse_header(data, ptr, metadata):
     ptr += 4
 
     # 4-byte version number
-    version = get_integer(data, ptr, 4)
+    version = _get_integer(data, ptr, 4)
     if version not in (2, 3, 4):
         print("unsupported version number %d", version)
         sys.exit(-1)
@@ -31,7 +31,7 @@ def parse_header(data, ptr, metadata):
     ptr += 4
 
     # 32-bit number of index entries
-    metadata["number"] = get_integer(data, ptr, 4)
+    metadata["number"] = _get_integer(data, ptr, 4)
     ptr += 4
 
     size = len(data)
@@ -57,7 +57,7 @@ def _get_mode_str(m):
     )
 
 
-def parse_entry(data, ptr, metadata):
+def _parse_entry(data, ptr, metadata):
     """Parse index entry"""
     entry_begin = ptr
     # ctime seconds
@@ -73,7 +73,7 @@ def parse_entry(data, ptr, metadata):
     # ino
     ptr += 4
     # mode
-    mode = _get_mode_str(get_integer(data, ptr, 4) & 0xFFFF)
+    mode = _get_mode_str(_get_integer(data, ptr, 4) & 0xFFFF)
     ptr += 4
     # uid
     ptr += 4
@@ -85,7 +85,7 @@ def parse_entry(data, ptr, metadata):
     sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
     ptr += 20
     # flags
-    flags = get_integer(data, ptr, 2)
+    flags = _get_integer(data, ptr, 2)
     stage = (flags >> 12) & 0x3
     ptr += 2
     if metadata["version"] == 2:
@@ -111,7 +111,7 @@ def parse_entry(data, ptr, metadata):
     return ptr
 
 
-def parse_ext_tree(data, ptr, size, metadata):
+def _parse_ext_tree(data, ptr, size, metadata):
     """Parse payload of cached tree extension"""
     end = ptr+size
     while ptr < end:
@@ -141,7 +141,7 @@ def parse_ext_tree(data, ptr, size, metadata):
             ptr += 20
 
 
-def parse_ext_reuc(data, ptr, size, metadata):
+def _parse_ext_reuc(data, ptr, size, metadata):
     """Parse payload of resolve undo extension"""
     end = ptr+size
     while ptr < end:
@@ -181,25 +181,25 @@ def parse_ext_reuc(data, ptr, size, metadata):
     pass
 
 
-def parse_ext_link(data, ptr, size, metadata):
+def _parse_ext_link(data, ptr, size, metadata):
     """Parse payload of split index extension"""
     pass
 
 
-def parse_extension(data, ptr, metadata):
+def _parse_extension(data, ptr, metadata):
     sig = data[ptr:ptr+4]
     ptr += 4
 
-    size = get_integer(data, ptr, 4)
+    size = _get_integer(data, ptr, 4)
     ptr += 4
 
     metadata["msgs"].append(sig)
     if sig == "TREE":
-        parse_ext_tree(data, ptr, size, metadata)
+        _parse_ext_tree(data, ptr, size, metadata)
     elif sig == "REUC":
-        parse_ext_reuc(data, ptr, size, metadata)
+        _parse_ext_reuc(data, ptr, size, metadata)
     elif sig == "link":
-        parse_ext_link(data, ptr, size, metadata)
+        _parse_ext_link(data, ptr, size, metadata)
     else:
         raise Exception("unknown signature %s" % sig)
 
@@ -219,14 +219,14 @@ def parse(fname):
     metadata = {"msgs": []}
     ptr = 0
 
-    ptr = parse_header(data, ptr, metadata)
+    ptr = _parse_header(data, ptr, metadata)
 
     while ptr < metadata["endptr"]:
         if metadata["number"] > 0:
-            ptr = parse_entry(data, ptr, metadata)
+            ptr = _parse_entry(data, ptr, metadata)
             metadata["number"] -= 1
         else:
-            ptr = parse_extension(data, ptr, metadata)
+            ptr = _parse_extension(data, ptr, metadata)
     return metadata["msgs"]
 
 
