@@ -45,7 +45,8 @@ def parse_header(data, ptr, metadata):
         sys.exit(-1)
     metadata["endptr"] = size - 20
 
-    print("%s (dircache), %d entries" % (sig, metadata["number"]))
+    metadata["msgs"].append(
+        "%s (dircache), %d entries" % (sig, metadata["number"]))
     return ptr
 
 
@@ -85,12 +86,14 @@ def parse_entry(data, ptr, metadata):
         ptr += 2
     name_length = flags & 0xFFF
     if name_length < 0xFFF:
-        print("%s (stage:%d) %s" % (sha1, stage, data[ptr:ptr+name_length]))
+        metadata["msgs"].append(
+            "%s (stage:%d) %s" % (sha1, stage, data[ptr:ptr+name_length]))
         ptr += name_length
     else:
         name_end = data.find("\0", ptr)
         assert name_end != -1
-        print("%s (stage:%d) %s" % (sha1, stage, data[ptr:name_end]))
+        metadata["msgs"].append(
+            "%s (stage:%d) %s" % (sha1, stage, data[ptr:name_end]))
         ptr = name_end
 
     if metadata["version"] != 4:
@@ -120,7 +123,8 @@ def parse_ext_tree(data, ptr, size, metadata):
 
         assert ptr+20 <= end
         sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
-        print("%s (%s/%s) %s" % (sha1, subtrees, entry_count, path))
+        metadata["msgs"].append(
+            "%s (%s/%s) %s" % (sha1, subtrees, entry_count, path))
         ptr += 20
 
 
@@ -141,7 +145,7 @@ def parse_extension(data, ptr, metadata):
     size = get_integer(data, ptr, 4)
     ptr += 4
 
-    print(sig)
+    metadata["msgs"].append(sig)
     if sig == "TREE":
         parse_ext_tree(data, ptr, size, metadata)
     elif sig == "REUC":
@@ -155,7 +159,7 @@ def parse_extension(data, ptr, metadata):
 
 
 # https://www.kernel.org/pub/software/scm/git/docs/technical/index-format.txt
-def main(fname):
+def parse(fname):
     try:
         f = open(fname)
     except Exception:
@@ -164,7 +168,7 @@ def main(fname):
 
     data = f.read()
 
-    metadata = {}
+    metadata = {"msgs": []}
     ptr = 0
 
     ptr = parse_header(data, ptr, metadata)
@@ -175,10 +179,13 @@ def main(fname):
             metadata["number"] -= 1
         else:
             ptr = parse_extension(data, ptr, metadata)
+    return metadata["msgs"]
 
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print("usage: %s index_file" % sys.argv[0])
         sys.exit(-1)
-    main(sys.argv[1])
+    msgs = parse(sys.argv[1])
+    for msg in msgs:
+        print(msg)
