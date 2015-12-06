@@ -77,6 +77,7 @@ def parse_entry(data, ptr, metadata):
     ptr += 20
     # flags
     flags = get_integer(data, ptr, 2)
+    stage = (flags >> 12) & 0x3
     ptr += 2
     if metadata["version"] == 2:
         assert (flags & 0x4000) == 0
@@ -84,12 +85,12 @@ def parse_entry(data, ptr, metadata):
         ptr += 2
     name_length = flags & 0xFFF
     if name_length < 0xFFF:
-        print("%s %s" % (sha1, data[ptr:ptr+name_length]))
+        print("%s (stage:%d) %s" % (sha1, stage, data[ptr:ptr+name_length]))
         ptr += name_length
     else:
         name_end = data.find("\0", ptr)
         assert name_end != -1
-        print("%s %s" % (sha1, data[ptr:name_end]))
+        print("%s (stage:%d) %s" % (sha1, stage, data[ptr:name_end]))
         ptr = name_end
 
     if metadata["version"] != 4:
