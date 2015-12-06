@@ -24,6 +24,18 @@ class TestGitCatIndex(unittest.TestCase):
         for i in range(len(expected)):
             self.assertEqual(expected[i], msgs[i])
 
+    def test_invalidated_tree(self):
+        msgs = parse("testdata/invalidated-tree")
+        expected = [
+            "DIRC (dircache), 2 entries",
+            "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0) a",
+            "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0) b",
+            "TREE",
+            "invalidated (0/-1) "
+        ]
+        for i in range(len(expected)):
+            self.assertEqual(expected[i], msgs[i])
+
     def test_conflict(self):
         msgs = parse("testdata/conflict")
         expected = [

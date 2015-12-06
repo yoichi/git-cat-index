@@ -121,11 +121,15 @@ def parse_ext_tree(data, ptr, size, metadata):
         subtrees = data[ptr:subtrees_end]
         ptr = subtrees_end+1
 
-        assert ptr+20 <= end
-        sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
-        metadata["msgs"].append(
-            "%s (%s/%s) %s" % (sha1, subtrees, entry_count, path))
-        ptr += 20
+        if entry_count[0] == "-":
+            metadata["msgs"].append(
+                "invalidated (%s/%s) %s" % (subtrees, entry_count, path))
+        else:
+            assert ptr+20 <= end
+            sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
+            metadata["msgs"].append(
+                "%s (%s/%s) %s" % (sha1, subtrees, entry_count, path))
+            ptr += 20
 
 
 def parse_ext_reuc(data, ptr, size, metadata):
