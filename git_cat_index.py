@@ -50,6 +50,13 @@ def parse_header(data, ptr, metadata):
     return ptr
 
 
+def _get_mode_str(m):
+    return "%d%d0%d%d%d" % (
+        m >> 15, (m >> 12) & 0x7,
+        (m >> 6) & 0x7, (m >> 3) & 0x7, m & 0x7
+    )
+
+
 def parse_entry(data, ptr, metadata):
     """Parse index entry"""
     entry_begin = ptr
@@ -66,6 +73,7 @@ def parse_entry(data, ptr, metadata):
     # ino
     ptr += 4
     # mode
+    mode = _get_mode_str(get_integer(data, ptr, 4) & 0xFFFF)
     ptr += 4
     # uid
     ptr += 4
@@ -87,13 +95,14 @@ def parse_entry(data, ptr, metadata):
     name_length = flags & 0xFFF
     if name_length < 0xFFF:
         metadata["msgs"].append(
-            "%s (stage:%d) %s" % (sha1, stage, data[ptr:ptr+name_length]))
+            "%s (stage:%d) %6s %s" % (sha1, stage, mode,
+                                      data[ptr:ptr+name_length]))
         ptr += name_length
     else:
         name_end = data.find("\0", ptr)
         assert name_end != -1
         metadata["msgs"].append(
-            "%s (stage:%d) %s" % (sha1, stage, data[ptr:name_end]))
+            "%s (stage:%d) %6s %s" % (sha1, stage, mode, data[ptr:name_end]))
         ptr = name_end
 
     if metadata["version"] != 4:
