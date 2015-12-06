@@ -134,6 +134,41 @@ def parse_ext_tree(data, ptr, size, metadata):
 
 def parse_ext_reuc(data, ptr, size, metadata):
     """Parse payload of resolve undo extension"""
+    end = ptr+size
+    while ptr < end:
+        path_end = data.find("\0", ptr, end)
+        assert path_end != -1
+        path = data[ptr:path_end]
+        ptr = path_end+1
+
+        modes = []
+
+        mode1_end = data.find("\0", ptr, end)
+        assert mode1_end != -1
+        modes.append(data[ptr:mode1_end])
+        ptr = mode1_end+1
+        
+        mode2_end = data.find("\0", ptr, end)
+        assert mode2_end != -1
+        modes.append(data[ptr:mode2_end])
+        ptr = mode2_end+1
+
+        mode3_end = data.find("\0", ptr, end)
+        assert mode3_end != -1
+        modes.append(data[ptr:mode3_end])
+        ptr = mode3_end+1
+
+        for i in range(3):
+            if modes[i] == "0":
+                metadata["msgs"].append(
+                    "%40s (stage:%d) %6s %s" % ("", i+1, modes[i], path))
+            else:
+                assert ptr+20 <= end
+                sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
+                metadata["msgs"].append(
+                    "%s (stage:%d) %6s %s" % (sha1, i+1, modes[i], path))
+                ptr += 20
+
     pass
 
 
