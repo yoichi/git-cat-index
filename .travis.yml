@@ -1,5 +1,9 @@
 language: python
 os:
   - linux
+install:
+  - pip install -r test-requirements.txt
 script:
-  - python test.py
+  - coverage run test.py
+after_success:  
+  - coveralls
