@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+"""Parse git index file"""
+
+
 import hashlib
 import sys
 
@@ -156,7 +159,7 @@ def _parse_ext_reuc(data, ptr, size, metadata):
         assert mode1_end != -1
         modes.append(data[ptr:mode1_end])
         ptr = mode1_end+1
-        
+
         mode2_end = data.find("\0", ptr, end)
         assert mode2_end != -1
         modes.append(data[ptr:mode2_end])
@@ -177,8 +180,6 @@ def _parse_ext_reuc(data, ptr, size, metadata):
                 metadata["msgs"].append(
                     "%s (stage:%d) %6s %s" % (sha1, i+1, modes[i], path))
                 ptr += 20
-
-    pass
 
 
 def _parse_ext_link(data, ptr, size, metadata):
@@ -208,6 +209,7 @@ def _parse_extension(data, ptr, metadata):
 
 # https://www.kernel.org/pub/software/scm/git/docs/technical/index-format.txt
 def parse(fname):
+    """Parse git index file"""
     try:
         f = open(fname)
     except Exception:
