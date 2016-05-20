@@ -94,19 +94,35 @@ def _parse_entry(data, ptr, metadata):
     if metadata["version"] == 2:
         assert (flags & 0x4000) == 0
     elif flags & 0x4000:
+        # external flag
         ptr += 2
-    name_length = flags & 0xFFF
-    if name_length < 0xFFF:
-        metadata["msgs"].append(
-            "%s (stage:%d) %6s %s" % (sha1, stage, mode,
-                                      data[ptr:ptr+name_length]))
-        ptr += name_length
-    else:
+    if metadata["version"] == 4:
+        offset = _get_integer(data, ptr, 1)
+        ptr += 1
         name_end = data.find("\0", ptr)
         assert name_end != -1
+        if offset == 0:
+            name = metadata["name"]
+        else:
+            name = metadata["name"][:-offset]
+        name += data[ptr:name_end]
         metadata["msgs"].append(
-            "%s (stage:%d) %6s %s" % (sha1, stage, mode, data[ptr:name_end]))
-        ptr = name_end
+            "%s (stage:%d) %6s %s" % (sha1, stage, mode, name))
+        metadata["name"] = name
+        ptr = name_end + 1
+    else:
+        name_length = flags & 0xFFF
+        if name_length < 0xFFF:
+            metadata["msgs"].append(
+                "%s (stage:%d) %6s %s" % (sha1, stage, mode,
+                                          data[ptr:ptr+name_length]))
+            ptr += name_length
+        else:
+            name_end = data.find("\0", ptr)
+            assert name_end != -1
+            metadata["msgs"].append(
+                "%s (stage:%d) %6s %s" % (sha1, stage, mode, data[ptr:name_end]))
+            ptr = name_end
 
     if metadata["version"] != 4:
         # 1-8 nul bytes
@@ -218,7 +234,7 @@ def parse(fname):
 
     data = f.read()
 
-    metadata = {"msgs": []}
+    metadata = {"msgs": [], "name": ""}
     ptr = 0
 
     ptr = _parse_header(data, ptr, metadata)
