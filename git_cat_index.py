@@ -233,6 +233,7 @@ def parse(fname):
         sys.exit(-1)
 
     data = f.read()
+    f.close()
 
     metadata = {"msgs": [], "name": ""}
     ptr = 0
