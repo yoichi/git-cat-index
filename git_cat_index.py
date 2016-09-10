@@ -16,12 +16,12 @@ def _get_integer(buf, index, size):
     return value
 
 
-def _parse_header(data, ptr, metadata):
+def _parse_header(data, ptr, metadata, fname):
     """Parse 12-byte header and checksum"""
     # 4-byte signature stands for "dircache"
     sig = data[ptr:ptr+4]
     if sig != "DIRC":
-        print("%s is not a index file" % sys.argv[1])
+        print("%s is not a index file" % fname)
         sys.exit(-1)
     ptr += 4
 
@@ -229,7 +229,7 @@ def parse(fname):
     try:
         f = open(fname, "rb")
     except Exception:
-        print("open %s failed" % sys.argv[1])
+        print("open %s failed" % fname)
         sys.exit(-1)
 
     data = f.read()
@@ -238,7 +238,7 @@ def parse(fname):
     metadata = {"msgs": [], "name": ""}
     ptr = 0
 
-    ptr = _parse_header(data, ptr, metadata)
+    ptr = _parse_header(data, ptr, metadata, fname)
 
     while ptr < metadata["endptr"]:
         if metadata["number"] > 0:
