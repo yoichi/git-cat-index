@@ -227,7 +227,7 @@ def _parse_extension(data, ptr, metadata):
 def parse(fname):
     """Parse git index file"""
     try:
-        f = open(fname)
+        f = open(fname, "rb")
     except Exception:
         print("open %s failed" % sys.argv[1])
         sys.exit(-1)
