@@ -21,15 +21,13 @@ def _parse_header(data, ptr, metadata, fname):
     # 4-byte signature stands for "dircache"
     sig = data[ptr:ptr+4]
     if sig != "DIRC":
-        print("%s is not a index file" % fname)
-        sys.exit(-1)
+        raise Exception("%s is not a index file" % fname)
     ptr += 4
 
     # 4-byte version number
     version = _get_integer(data, ptr, 4)
     if version not in (2, 3, 4):
-        print("unsupported version number %d", version)
-        sys.exit(-1)
+        raise Exception("unsupported version number %d", version)
     metadata["version"] = version
     ptr += 4
 
@@ -39,13 +37,11 @@ def _parse_header(data, ptr, metadata, fname):
 
     size = len(data)
     if size < ptr + 20:
-        print("data is too short")
-        sys.exit(-1)
+        raise Exception("data is too short")
 
     sha1 = hashlib.sha1(data[:-20]).digest()
     if sha1 != data[-20:]:
-        print("checksum mismatch")
-        sys.exit(-1)
+        raise Exception("checksum mismatch")
     metadata["endptr"] = size - 20
 
     metadata["msgs"].append(
@@ -226,14 +222,8 @@ def _parse_extension(data, ptr, metadata):
 # https://www.kernel.org/pub/software/scm/git/docs/technical/index-format.txt
 def parse(fname):
     """Parse git index file"""
-    try:
-        f = open(fname, "rb")
-    except Exception:
-        print("open %s failed" % fname)
-        sys.exit(-1)
-
-    data = f.read()
-    f.close()
+    with open(fname, "rb") as f:
+        data = f.read()
 
     metadata = {"msgs": [], "name": ""}
     ptr = 0
