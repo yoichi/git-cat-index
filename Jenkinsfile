@@ -2,8 +2,10 @@ pipeline {
     agent any
     stages {
         stage('test') {
-            checkout scm
-            sh 'python test.py'
+            steps {
+                checkout scm
+                sh 'python test.py'
+            }
         }
     }
 }
