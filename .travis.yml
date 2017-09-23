@@ -1,0 +1,14 @@
+language: python
+python:
+  - "3.6"
+  - "3.5"
+  - "2.7"
+  - "pypy"
+os:
+  - linux
+install:
+  - pip install -r test-requirements.txt
+script:
+  - coverage run test.py
+after_success:
+  - coveralls
