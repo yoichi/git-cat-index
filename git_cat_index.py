@@ -1,32 +1,40 @@
 #!/usr/bin/env python
+"""Parse git index file"""
+
+
 import hashlib
 import sys
+
+
+def _ord(x):
+    if sys.version_info[0] < 3:
+        return ord(x)
+    else:
+        return x
 
 
 def _get_integer(buf, index, size):
     value = 0
     while size > 0:
         value <<= 8
-        value += ord(buf[index])
+        value += _ord(buf[index])
         index += 1
         size -= 1
     return value
 
 
-def _parse_header(data, ptr, metadata):
+def _parse_header(data, ptr, metadata, fname):
     """Parse 12-byte header and checksum"""
     # 4-byte signature stands for "dircache"
     sig = data[ptr:ptr+4]
-    if sig != "DIRC":
-        print("%s is not a index file" % sys.argv[1])
-        sys.exit(-1)
+    if sig != b"DIRC":
+        raise Exception("%s is not a index file" % fname)
     ptr += 4
 
     # 4-byte version number
     version = _get_integer(data, ptr, 4)
     if version not in (2, 3, 4):
-        print("unsupported version number %d", version)
-        sys.exit(-1)
+        raise Exception("unsupported version number %d", version)
     metadata["version"] = version
     ptr += 4
 
@@ -36,17 +44,15 @@ def _parse_header(data, ptr, metadata):
 
     size = len(data)
     if size < ptr + 20:
-        print("data is too short")
-        sys.exit(-1)
+        raise Exception("data is too short")
 
     sha1 = hashlib.sha1(data[:-20]).digest()
     if sha1 != data[-20:]:
-        print("checksum mismatch")
-        sys.exit(-1)
+        raise Exception("checksum mismatch")
     metadata["endptr"] = size - 20
 
     metadata["msgs"].append(
-        "%s (dircache), %d entries" % (sig, metadata["number"]))
+        "%s (dircache), %d entries" % (sig.decode(), metadata["number"]))
     return ptr
 
 
@@ -82,7 +88,7 @@ def _parse_entry(data, ptr, metadata):
     # file size
     ptr += 4
     # SHA-1 hash of blob object
-    sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
+    sha1 = "".join(format(_ord(x), '02x') for x in data[ptr:ptr+20])
     ptr += 20
     # flags
     flags = _get_integer(data, ptr, 2)
@@ -91,19 +97,36 @@ def _parse_entry(data, ptr, metadata):
     if metadata["version"] == 2:
         assert (flags & 0x4000) == 0
     elif flags & 0x4000:
+        # external flag
         ptr += 2
-    name_length = flags & 0xFFF
-    if name_length < 0xFFF:
-        metadata["msgs"].append(
-            "%s (stage:%d) %6s %s" % (sha1, stage, mode,
-                                      data[ptr:ptr+name_length]))
-        ptr += name_length
-    else:
-        name_end = data.find("\0", ptr)
+    if metadata["version"] == 4:
+        offset = _get_integer(data, ptr, 1)
+        ptr += 1
+        name_end = data.find(b"\0", ptr)
         assert name_end != -1
+        if offset == 0:
+            name = metadata["name"]
+        else:
+            name = metadata["name"][:-offset]
+        name += data[ptr:name_end].decode()
         metadata["msgs"].append(
-            "%s (stage:%d) %6s %s" % (sha1, stage, mode, data[ptr:name_end]))
-        ptr = name_end
+            "%s (stage:%d) %6s %s" % (sha1, stage, mode, name))
+        metadata["name"] = name
+        ptr = name_end + 1
+    else:
+        name_length = flags & 0xFFF
+        if name_length < 0xFFF:
+            metadata["msgs"].append(
+                "%s (stage:%d) %6s %s" % (
+                    sha1, stage, mode, data[ptr:ptr+name_length].decode()))
+            ptr += name_length
+        else:
+            name_end = data.find(b"\0", ptr)
+            assert name_end != -1
+            metadata["msgs"].append(
+                "%s (stage:%d) %6s %s" % (
+                    sha1, stage, mode, data[ptr:name_end].decode()))
+            ptr = name_end
 
     if metadata["version"] != 4:
         # 1-8 nul bytes
@@ -115,29 +138,33 @@ def _parse_ext_tree(data, ptr, size, metadata):
     """Parse payload of cached tree extension"""
     end = ptr+size
     while ptr < end:
-        path_end = data.find("\0", ptr, end)
+        path_end = data.find(b"\0", ptr, end)
         assert path_end != -1
         path = data[ptr:path_end]
         ptr = path_end+1
 
-        entry_count_end = data.find(" ", ptr, end)
+        entry_count_end = data.find(b" ", ptr, end)
         assert entry_count_end != -1
         entry_count = data[ptr:entry_count_end]
         ptr = entry_count_end+1
 
-        subtrees_end = data.find("\n", ptr, end)
+        subtrees_end = data.find(b"\n", ptr, end)
         assert subtrees_end != 1
         subtrees = data[ptr:subtrees_end]
         ptr = subtrees_end+1
 
-        if entry_count[0] == "-":
+        if entry_count[0] == b"-"[0]:
             metadata["msgs"].append(
-                "invalidated (%s/%s) %s" % (subtrees, entry_count, path))
+                "invalidated (%s/%s) %s" % (
+                    subtrees.decode(), entry_count.decode(),
+                    path.decode()))
         else:
             assert ptr+20 <= end
-            sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
+            sha1 = "".join(format(_ord(x), '02x') for x in data[ptr:ptr+20])
             metadata["msgs"].append(
-                "%s (%s/%s) %s" % (sha1, subtrees, entry_count, path))
+                "%s (%s/%s) %s" % (
+                    sha1, subtrees.decode(), entry_count.decode(),
+                    path.decode()))
             ptr += 20
 
 
@@ -145,40 +172,40 @@ def _parse_ext_reuc(data, ptr, size, metadata):
     """Parse payload of resolve undo extension"""
     end = ptr+size
     while ptr < end:
-        path_end = data.find("\0", ptr, end)
+        path_end = data.find(b"\0", ptr, end)
         assert path_end != -1
         path = data[ptr:path_end]
         ptr = path_end+1
 
         modes = []
 
-        mode1_end = data.find("\0", ptr, end)
+        mode1_end = data.find(b"\0", ptr, end)
         assert mode1_end != -1
         modes.append(data[ptr:mode1_end])
         ptr = mode1_end+1
-        
-        mode2_end = data.find("\0", ptr, end)
+
+        mode2_end = data.find(b"\0", ptr, end)
         assert mode2_end != -1
         modes.append(data[ptr:mode2_end])
         ptr = mode2_end+1
 
-        mode3_end = data.find("\0", ptr, end)
+        mode3_end = data.find(b"\0", ptr, end)
         assert mode3_end != -1
         modes.append(data[ptr:mode3_end])
         ptr = mode3_end+1
 
         for i in range(3):
-            if modes[i] == "0":
+            if modes[i] == b"0":
                 metadata["msgs"].append(
-                    "%40s (stage:%d) %6s %s" % ("", i+1, modes[i], path))
+                    "%40s (stage:%d) %6s %s" % (
+                        "", i+1, modes[i].decode(), path.decode()))
             else:
                 assert ptr+20 <= end
-                sha1 = "".join(format(ord(x), '02x') for x in data[ptr:ptr+20])
+                sha1 = "".join(format(_ord(x), '02x') for x in data[ptr:ptr+20])
                 metadata["msgs"].append(
-                    "%s (stage:%d) %6s %s" % (sha1, i+1, modes[i], path))
+                    "%s (stage:%d) %6s %s" % (
+                        sha1, i+1, modes[i].decode(), path.decode()))
                 ptr += 20
-
-    pass
 
 
 def _parse_ext_link(data, ptr, size, metadata):
@@ -193,12 +220,12 @@ def _parse_extension(data, ptr, metadata):
     size = _get_integer(data, ptr, 4)
     ptr += 4
 
-    metadata["msgs"].append(sig)
-    if sig == "TREE":
+    metadata["msgs"].append(sig.decode())
+    if sig == b"TREE":
         _parse_ext_tree(data, ptr, size, metadata)
-    elif sig == "REUC":
+    elif sig == b"REUC":
         _parse_ext_reuc(data, ptr, size, metadata)
-    elif sig == "link":
+    elif sig == b"link":
         _parse_ext_link(data, ptr, size, metadata)
     else:
         raise Exception("unknown signature %s" % sig)
@@ -208,18 +235,14 @@ def _parse_extension(data, ptr, metadata):
 
 # https://www.kernel.org/pub/software/scm/git/docs/technical/index-format.txt
 def parse(fname):
-    try:
-        f = open(fname)
-    except Exception:
-        print("open %s failed" % sys.argv[1])
-        sys.exit(-1)
+    """Parse git index file"""
+    with open(fname, "rb") as f:
+        data = f.read()
 
-    data = f.read()
-
-    metadata = {"msgs": []}
+    metadata = {"msgs": [], "name": ""}
     ptr = 0
 
-    ptr = _parse_header(data, ptr, metadata)
+    ptr = _parse_header(data, ptr, metadata, fname)
 
     while ptr < metadata["endptr"]:
         if metadata["number"] > 0:
