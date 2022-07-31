@@ -52,7 +52,7 @@ def _parse_header(data, ptr, metadata, fname):
     metadata["endptr"] = size - 20
 
     metadata["msgs"].append(
-        "%s (dircache), %d entries" % (sig.decode(), metadata["number"]))
+        "%s (dircache), version %d, %d entries" % (sig.decode(), metadata["version"], metadata["number"]))
     return ptr
 
 
