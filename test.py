@@ -98,6 +98,31 @@ class TestGitCatIndex(unittest.TestCase):
         for i in range(len(expected)):
             self.assertEqual(expected[i], msgs[i])
 
+    def test_intent_to_add(self):
+        msgs = parse("testdata/intent-to-add")
+        expected = [
+            "DIRC (dircache), version 3, 1 entries",
+            "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0,intent-to-add) "
+            "100644 readme.txt",
+            "TREE",
+            "invalidated (0/-1) "
+        ]
+        for i in range(len(expected)):
+            self.assertEqual(expected[i], msgs[i])
+
+    def test_skip_worktree(self):
+        msgs = parse("testdata/skip-worktree")
+        expected = [
+            "DIRC (dircache), version 3, 1 entries",
+            "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0,skip-worktree) "
+            "100644 subdir/.gitignore",
+            "TREE",
+            "138fb471015a969d7af7ddd5e32c069cf07871dc (1/1) ",
+            "82e3a754b6a0fcb238b03c0e47d05219fbf9cf89 (0/1) subdir"
+        ]
+        for i in range(len(expected)):
+            self.assertEqual(expected[i], msgs[i])
+
 
 if __name__ == '__main__':
     unittest.main()
