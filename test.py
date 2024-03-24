@@ -7,7 +7,7 @@ class TestGitCatIndex(unittest.TestCase):
     def test_an_empty_file(self):
         msgs = parse("testdata/an-empty-file")
         expected = [
-            "DIRC (dircache), 1 entries",
+            "DIRC (dircache), version 2, 1 entries",
             "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0) "
             "100644 readme.txt"
         ]
@@ -17,7 +17,7 @@ class TestGitCatIndex(unittest.TestCase):
     def test_index_v4(self):
         msgs = parse("testdata/v4")
         expected = [
-            "DIRC (dircache), 2 entries",
+            "DIRC (dircache), version 4, 2 entries",
             "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0) "
             "100644 readme.txt",
             "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0) "
@@ -29,7 +29,7 @@ class TestGitCatIndex(unittest.TestCase):
     def test_after_commit(self):
         msgs = parse("testdata/after-commit")
         expected = [
-            "DIRC (dircache), 1 entries",
+            "DIRC (dircache), version 2, 1 entries",
             "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0) "
             "100644 readme.txt",
             "TREE",
@@ -41,7 +41,7 @@ class TestGitCatIndex(unittest.TestCase):
     def test_invalidated_tree(self):
         msgs = parse("testdata/invalidated-tree")
         expected = [
-            "DIRC (dircache), 2 entries",
+            "DIRC (dircache), version 2, 2 entries",
             "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0) 100644 a",
             "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:0) 100644 b",
             "TREE",
@@ -53,7 +53,7 @@ class TestGitCatIndex(unittest.TestCase):
     def test_conflict(self):
         msgs = parse("testdata/conflict")
         expected = [
-            "DIRC (dircache), 3 entries",
+            "DIRC (dircache), version 2, 3 entries",
             "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 (stage:1) "
             "100644 readme.txt",
             "72943a16fb2c8f38f9dde202b7a70ccc19c52f34 (stage:2) "
@@ -67,7 +67,7 @@ class TestGitCatIndex(unittest.TestCase):
     def test_resolve(self):
         msgs = parse("testdata/resolve")
         expected = [
-            "DIRC (dircache), 1 entries",
+            "DIRC (dircache), version 2, 1 entries",
             "f761ec192d9f0dca3329044b96ebdb12839dbff6 (stage:0) "
             "100644 readme.txt",
             "REUC",
@@ -84,7 +84,7 @@ class TestGitCatIndex(unittest.TestCase):
     def test_reuc_missing_stage(self):
         msgs = parse("testdata/reuc-missing-stage")
         expected = [
-            "DIRC (dircache), 1 entries",
+            "DIRC (dircache), version 2, 1 entries",
             "0f0e04a55cae4cb726cc89a3c3b13203836b4ed7 (stage:0) "
             "100644 readme.txt",
             "REUC",
