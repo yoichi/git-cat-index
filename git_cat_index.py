@@ -92,12 +92,21 @@ def _parse_entry(data, ptr, metadata):
     ptr += 20
     # flags
     flags = _get_integer(data, ptr, 2)
+    # stage (during merge)
     stage = (flags >> 12) & 0x3
     ptr += 2
+    extended = ""
     if metadata["version"] == 2:
         assert (flags & 0x4000) == 0
     elif flags & 0x4000:
-        # external flag
+        # extended flag
+        extended_flag = _get_integer(data, ptr, 2)
+        # skip-worktree flag (used by sparse checkout)
+        if (extended_flag >> 14) & 0x1:
+            extended += ",skip-worktree"
+        # intent-to-add flag (used by "git add -N")
+        if (extended_flag >> 13) & 0x1:
+            extended += ",intent-to-add"
         ptr += 2
     if metadata["version"] == 4:
         offset = _get_integer(data, ptr, 1)
@@ -110,22 +119,23 @@ def _parse_entry(data, ptr, metadata):
             name = metadata["name"][:-offset]
         name += data[ptr:name_end].decode()
         metadata["msgs"].append(
-            "%s (stage:%d) %6s %s" % (sha1, stage, mode, name))
+            "%s (stage:%d%s) %6s %s" % (sha1, stage, extended, mode, name))
         metadata["name"] = name
         ptr = name_end + 1
     else:
         name_length = flags & 0xFFF
         if name_length < 0xFFF:
             metadata["msgs"].append(
-                "%s (stage:%d) %6s %s" % (
-                    sha1, stage, mode, data[ptr:ptr+name_length].decode()))
+                "%s (stage:%d%s) %6s %s" % (
+                    sha1, stage, extended, mode,
+                    data[ptr:ptr+name_length].decode()))
             ptr += name_length
         else:
             name_end = data.find(b"\0", ptr)
             assert name_end != -1
             metadata["msgs"].append(
-                "%s (stage:%d) %6s %s" % (
-                    sha1, stage, mode, data[ptr:name_end].decode()))
+                "%s (stage:%d%s) %6s %s" % (
+                    sha1, stage, extended, mode, data[ptr:name_end].decode()))
             ptr = name_end
 
     if metadata["version"] != 4:
